@@ -9,45 +9,6 @@ const getCount = (text) => text.slice(1);
 const getTagAndCount = (text) => ({ tag: getTag(text), count: getCount(text) });
 const getText = (node) => node.innerText;
 
-// 合并前两个短table
-const mergeShortTable = (timeOut) => {
-  let rmNodeMap = [];
-  const isEqual = (node1, node2) => {
-    const nodeText = getText(node1);
-    const nextText = getText(node2);
-    return (
-      getTag(nodeText) === getTag(nextText) &&
-      getCount(nodeText) === getCount(nextText)
-    );
-  };
-  const compare = (node) => {
-    if (!node) return;
-    let nextEle = node.nextElementSibling;
-    if (!nextEle) return;
-    const nodeText = node.innerText;
-
-    if (isEqual(node, nextEle)) {
-      node.innerText = getTag(nodeText) + 2 * parseInt(getCount(nodeText));
-      rmNodeMap.push(nextEle);
-      nextEle = nextEle.nextElementSibling;
-    }
-    compare(nextEle);
-  };
-
-  const merge = (table) => {
-    const oldLength = table.childNodes.length;
-    compare(table.firstElementChild);
-    rmNodeMap.forEach((n) => table.removeChild(n));
-    rmNodeMap = [];
-    const newLength = table.childNodes.length;
-    const finished = oldLength === newLength;
-    if (!timeOut && !finished) {
-      merge(table);
-    }
-    return finished;
-  };
-  return { merge };
-};
 const canMerge = (left, right) => {
   if (!right) return false;
   const { tag: lTag, count: lCount } = getTagAndCount(left);
@@ -55,14 +16,15 @@ const canMerge = (left, right) => {
   const isEqual = lTag === rTag && lCount === rCount;
   return isEqual ? lTag + 2 * parseInt(lCount) : false;
 };
-const mergeLongTable = (table, timeout) => {
+const mergeTable = (table, timeout, isLongTable) => {
   const childrenList = table.getElementsByTagName("td");
   const initArr = [];
   for (let i = 0; i < childrenList.length; i++) {
     initArr.push(childrenList[i].innerHTML);
   }
-  const result = calcResult(initArr, timeout);
-  console.log(result);
+  const { result, finish } = isLongTable
+    ? calcResult(calcLong(initArr, timeout), timeout)
+    : calcResult(initArr, timeout);
   const tdArr = [];
   result.forEach((r) => {
     const td = document.createElement("td");
@@ -74,61 +36,63 @@ const mergeLongTable = (table, timeout) => {
   const id = table.getAttribute("id");
   newTable.setAttribute("id", id);
   table.replaceWith(newTable);
+  return finish;
 };
 const calcResult = (result, timeout) => {
-  let res = [];
+  for (let i = 0; i < result.length; i++) {
+    const current = result[i];
+    const next = result[i + 1];
+    if (!next) {
+      return { result, finish: true };
+    }
+    const rr = canMerge(current, next);
+    if (!!rr) {
+      result.splice(i + 1, 1);
+      result[i] = rr;
+      return timeout ? { result, finish: false } : calcResult(result);
+    }
+  }
+};
+const calcLong = (result, timeout) => {
   let mergable = false;
   for (let i = 0; i < result.length; i++) {
     const current = result[i];
     const next = result[i + 1];
     if (!next) {
-      res.push(current);
-      break;
+      return result;
     }
     const rr = canMerge(current, next);
     if (!!rr) {
       mergable = true;
       result.splice(i + 1, 1);
       result[i] = rr;
-      res = result;
-      return res;
-    } else {
-      res.push(current);
     }
   }
-  if (timeout) return res;
-  return mergable ? calcResult(res) : res;
+  return mergable ? calcLong(result) : result;
 };
 function bt1_click() {
-  // const { merge } = mergeShortTable();
-  // merge(table1);
-  // merge(table2);
-  mergeLongTable(document.getElementById("t1"));
-  // mergeLongTable(table2);
-  // mergeLongTable(table3);
+  mergeTable(document.getElementById("t1"));
+  mergeTable(document.getElementById("t2"));
+  mergeTable(document.getElementById("t3"), undefined, true);
 }
 function bt2_click() {
-  let finish = false;
-  const interval = (table, timeout) => {
+  let finished = false;
+  const interval = (tableId, timeout, isThrid) => {
     const id = setInterval(() => {
-      const { merge } = mergeShortTable(22);
-      const finished = merge(table) || finish;
-      if (finished) {
+      const finish = mergeTable(document.getElementById(tableId), timeout);
+      if (isThrid) {
+        finished = finished || finish;
+        if (finished) {
+          clearInterval(id);
+          tdStatus.innerHTML = "已完成";
+        }
+      } else if (finish) {
         clearInterval(id);
-        tdStatus.innerHTML = "已完成";
-        finish = true;
+        finished = true;
       }
     }, timeout);
   };
-  const longInterval = (timeout) => {
-    const id = setInterval(() => {
-      mergeLongTable(timeout);
-      if (finish) {
-        clearInterval(id);
-      }
-    }, timeout);
-  };
-  interval(table1, 1000);
-  interval(table2, 1500);
-  longInterval(2000);
+  interval("t1", 1000);
+  interval("t2", 1500);
+  interval("t3", 2000, true);
 }
