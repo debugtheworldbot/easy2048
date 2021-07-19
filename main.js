@@ -2,14 +2,9 @@ const table1 = document.getElementById("t1");
 const table2 = document.getElementById("t2");
 const table3 = document.getElementById("t3");
 
-//根据id获取元素： document.getElementById(id)
-// 获取元素的第一个子元素：firstElementChild
-// 获取下一个同级元素： nextElementSibling
-// 删除元素：removeChild(childNode)
-// 末级元素内的值：innerHTML或innerText
-
 const getTag = (text) => text.slice(0, 1);
 const getCount = (text) => text.slice(1);
+const getTagAndCount = (text) => ({ tag: getTag(text), count: getCount(text) });
 const getText = (node) => node.innerText;
 const isEqual = (node1, node2) => {
   const nodeText = getText(node1);
@@ -35,6 +30,7 @@ const mergeShortTable = (timeOut) => {
     }
     compare(nextEle);
   };
+
   const merge = (table) => {
     const oldLength = table.childNodes.length;
     compare(table.firstElementChild);
@@ -49,17 +45,50 @@ const mergeShortTable = (timeOut) => {
   };
   return { merge };
 };
+const canMerge = (left, right) => {
+  if (!right) return false;
+  const { tag: lTag, count: lCount } = getTagAndCount(left);
+  const { tag: rTag, count: rCount } = getTagAndCount(right);
+  const isEqual = lTag === rTag && lCount === rCount;
+  return isEqual ? lTag + 2 * parseInt(lCount) : false;
+};
 const mergeLongTable = () => {
   const childrenList = table3.getElementsByTagName("td");
-  const a = [];
+  const initArr = [];
   for (let i = 0; i < childrenList.length; i++) {
-    a.push(childrenList[i].innerHTML);
+    initArr.push(childrenList[i].innerHTML);
   }
-  console.log(a);
-
-  const compare = (current) => {
-    if (!current) return;
-  };
+  const result = calcResult(initArr);
+  const tdArr = [];
+  result.forEach((r) => {
+    const td = document.createElement("td");
+    td.innerHTML = r;
+    tdArr.push(td);
+  });
+  const newTable = document.createElement("tr");
+  tdArr.forEach((td) => newTable.appendChild(td));
+  table3.replaceWith(newTable);
+};
+const calcResult = (result) => {
+  const res = [];
+  let mergable = false;
+  for (let i = 0; i < result.length; i++) {
+    const current = result[i];
+    const next = result[i + 1];
+    if (!next) {
+      res.push(current);
+      break;
+    }
+    const rr = canMerge(current, next);
+    if (!!rr) {
+      mergable = true;
+      res.push(rr);
+    } else {
+      res.push(current, next);
+    }
+    i += 1;
+  }
+  return mergable ? calcResult(res) : res;
 };
 function bt1_click() {
   const { merge } = mergeShortTable();
